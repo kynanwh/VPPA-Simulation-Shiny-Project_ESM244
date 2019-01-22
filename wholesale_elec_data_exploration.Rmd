@@ -1,0 +1,104 @@
+---
+title: "Wholesale Elec Data Exploration"
+author: "Kynan Witters Hicks"
+date: "January 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library}
+
+library(tidyverse)
+library(janitor)
+```
+
+
+###Wholesale Electricity Data Exploration
+
+##CAISO
+
+#5-minute intervale data for three hubs: 
+TH_NP15
+TH_SP15
+TH_ZP26
+
+##ERCOT
+
+#hourly intervale data for zones: 
+
+```{r data}
+
+ercot <- read.csv("ERCOT_realtime_price_hourly_2018.csv")
+
+```
+
+
+```{r wrangle}
+
+ercot$Date <- mdy_hm(ercot$Date)
+
+ercot_dt <- ercot %>%
+  rename(timestamp = Date ) %>% 
+  mutate(time = timestamp) %>% 
+  mutate(date = timestamp)
+
+
+ercot_dt$time <- format.POSIXct(ercot_dt$time, format = "%H:%M:%S")
+ercot_dt$date <- substr(ercot_dt$timestamp, start = 1, stop = 10)
+
+#ercot_dt$date <- format.POSIXct(ercot_dt$date, format = "%M:%D:%Y")
+ 
+#Not working
+
+
+```
+
+```{r summarize}
+
+average <- ercot %>% 
+  group_by(Zone) %>% 
+  summarize(
+    mean_price = mean(Price),
+    sd_price = sd(Price)
+  )
+
+```
+
+
+```{r visualize}
+
+hist_ercot <- ggplot(ercot, aes(x = Price)) +
+  geom_histogram(aes(color = Zone),
+                 breaks = c(seq(0, 300, by=10)),
+                 position = "identity") +
+  coord_cartesian(xlim = c(0,310)) +
+  facet_wrap(~Zone, scales = "free")
+
+
+point_ercot <- ggplot(ercot, aes(x = Date, y = Price)) +
+  geom_point(aes(color = Zone)) +
+  facet_wrap(~Zone, scales = "free")
+
+hist_ercot
+point_ercot
+
+```
+
+```{r energy_model}
+
+wind_tx <- read.csv("Texas_wind example.csv")
+
+wind_tx$Timestamp <- mdy_hm(wind_tx$Timestamp)
+
+wind_tx_2 <- wind_tx %>% 
+  clean_names() %>% 
+  select(timestamp, power_w, energy_m_wh)
+  
+
+ercot_energy <- full_join(wind_tx, ercot_dt, by = "timestamp") #Not working
+
+```
+

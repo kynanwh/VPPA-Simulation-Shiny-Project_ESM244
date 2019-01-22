@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(janitor)
+library(lubridate)
 ```
 
 
@@ -31,9 +32,31 @@ TH_ZP26
 
 ```{r data}
 
-ercot <- read.csv("ERCOT_realtime_price_hourly_2018.csv")
+wind_tx <- read.csv("Texas_wind example.csv")
+ercot_iso <-read.csv("ercot_iso.csv")
+nyiso_iso <- read.csv("nyiso_iso.csv")
+pjm_iso <- read.csv("pjm_iso.csv")
+isone_iso <- read.csv("isone.iso.csv")
+miso_iso <- read.csv("miso_iso.csv")
+caiso_iso <- read.csv("caiso_iso.csv")
 
 ```
+
+```{r merge_files}
+
+caiso_hr <- caiso_iso %>% 
+  group_by(timestamp = cut(timestamp, breaks = seq()
+
+
+full_iso <- full_join(ercot_iso, nyiso_iso) %>% 
+  full_join(pjm_iso) %>% 
+  full_join(isone_iso) %>% 
+  full_join(miso_iso)
+
+
+
+```
+
 
 
 ```{r wrangle}

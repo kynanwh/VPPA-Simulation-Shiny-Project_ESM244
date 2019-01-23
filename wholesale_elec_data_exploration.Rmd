@@ -45,7 +45,14 @@ caiso_iso <- read.csv("caiso_iso.csv")
 ```{r merge_files}
 
 caiso_hr <- caiso_iso %>% 
-  group_by(timestamp = cut(timestamp, breaks = seq()
+
+#Need to conver to hourly data. Example:
+#library(dplyr)
+#df %>% 
+ # filter(between(as.numeric(format(DateTime, "%M")), 25, 35)) %>% 
+ # group_by(hour=format(DateTime, "%Y-%m-%d %H")) %>%
+  #summarise(value=mean(value))
+  
 
 
 full_iso <- full_join(ercot_iso, nyiso_iso) %>% 

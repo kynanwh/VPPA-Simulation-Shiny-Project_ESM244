@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r library}
+```{r library, message = FALSE}
 
 library(tidyverse)
 library(janitor)
@@ -44,7 +44,7 @@ caiso_iso <- read.csv("caiso_iso.csv")
 
 ```{r merge_files}
 
-caiso_hr <- caiso_iso %>% 
+#caiso_hr <- caiso_iso %>% 
 
 #Need to conver to hourly data. Example:
 #library(dplyr)
@@ -58,13 +58,27 @@ caiso_hr <- caiso_iso %>%
 full_iso <- full_join(ercot_iso, nyiso_iso) %>% 
   full_join(pjm_iso) %>% 
   full_join(isone_iso) %>% 
-  full_join(miso_iso)
+  full_join(miso_iso) %>% 
+  mutate(date_time = as.POSIXct(full_iso$timestamp,
+                                 format="%m/%d/%Y %H:%M")) %>% 
+  select(iso, hub, lmp, date_time)
+
+
+
+
 
 
 
 ```
 
 
+
+
+
+
+
+
+##Other Examples
 
 ```{r wrangle}
 

@@ -14,6 +14,10 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(janitor)
 library(lubridate)
+library(dplyr)
+library(tsibble)
+library(anytime)
+
 ```
 
 
@@ -26,7 +30,50 @@ TH_NP15
 TH_SP15
 TH_ZP26
 
-##ERCOT
+```{r message=FALSE}
+
+## Turn 5-minute interval data into hourly ##
+
+caiso_iso_5min <- read_csv("caiso_iso.csv")
+
+#convert "Data" data from character to date/time
+
+caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
+                                 format="%m/%d/%Y %H:%M")
+
+#transform 5-minute interval data to hourly by taking hourly averages. Note: transforms date/time into factor
+
+caiso_iso_hr <- aggregate(caiso_iso_5min["price"],
+                          list(hour = cut(caiso_iso_5min$Date, breaks = "hour")),
+                          mean, na.rm = TRUE)
+
+caiso_iso_hr$hour <- strptime(x = as.character(caiso_iso_hr$hour),
+                              format = "%m-%d-%Y %H:%M")
+
+caiso_iso_hr$hour <- as.character(caiso_iso_hr$hour)
+
+caiso_iso_hr$hour <- as.POSIXct.default(caiso_iso_hr$hour,
+                                 format="%m-%d-%Y %H:%M:%S")
+
+
+```
+
+
+```{r}
+
+## Find data gaps ##
+
+#We have 8757 observations. We are missing 3
+
+caiso_tsibble <- caiso_iso_5min %>%
+  as_tsibble(key = id(price), index = Date)
+
+caiso_full <- caiso_tsibble %>% 
+  fill_gaps(price = 0)
+
+```
+
+
 
 #hourly intervale data for zones: 
 

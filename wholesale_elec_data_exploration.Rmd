@@ -17,6 +17,8 @@ library(lubridate)
 library(dplyr)
 library(tsibble)
 library(anytime)
+library(nycflights13)
+library(zoo)
 
 ```
 
@@ -30,6 +32,34 @@ TH_NP15
 TH_SP15
 TH_ZP26
 
+```{r}
+
+## Find data gaps ##
+
+caiso_iso_5min <- read_csv("caiso_iso.csv")
+
+#convert "Data" data from character to date/time
+
+caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
+                                 format="%m/%d/%Y %H:%M")
+
+# We have 8757 observations. We are missing 3
+# First remove duplicate date/times b/c tsibble no like that 
+
+clean_caiso_iso_5min <- caiso_iso_5min[!duplicated(caiso_iso_5min$Date),]
+
+caiso_tsibble <- clean_caiso_iso_5min %>%
+  as_tsibble(key = id(hub), index = Date) %>% 
+  fill_gaps(price)
+
+
+
+caiso_full <- caiso_tsibble %>% 
+  fill_gaps(price = 0)
+
+```
+
+
 ```{r message=FALSE}
 
 ## Turn 5-minute interval data into hourly ##
@@ -41,7 +71,14 @@ caiso_iso_5min <- read_csv("caiso_iso.csv")
 caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
                                  format="%m/%d/%Y %H:%M")
 
-#transform 5-minute interval data to hourly by taking hourly averages. Note: transforms date/time into factor
+#transform 5-minute interval data to hourly by taking hourly averages. 
+
+caiso_iso_hr2 <- caiso_iso_5min %>% 
+  mutate(date = date(Date), hour = hour(Date)) %>% 
+  group_by(date,hour) %>% 
+  dplyr::summarise(mean_price = mean(price))
+
+#Other transform method (Note: transforms date/time into factor)
 
 caiso_iso_hr <- aggregate(caiso_iso_5min["price"],
                           list(hour = cut(caiso_iso_5min$Date, breaks = "hour")),
@@ -58,20 +95,6 @@ caiso_iso_hr$hour <- as.POSIXct.default(caiso_iso_hr$hour,
 
 ```
 
-
-```{r}
-
-## Find data gaps ##
-
-#We have 8757 observations. We are missing 3
-
-caiso_tsibble <- caiso_iso_5min %>%
-  as_tsibble(key = id(price), index = Date)
-
-caiso_full <- caiso_tsibble %>% 
-  fill_gaps(price = 0)
-
-```
 
 
 

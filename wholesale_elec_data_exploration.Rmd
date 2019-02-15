@@ -41,6 +41,11 @@ caiso_iso_5min <- read_csv("caiso_iso.csv")
 caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
                                  format="%m/%d/%Y %H:%M")
 
+caiso_iso_hr2 <- caiso_iso_5min %>% 
+  mutate(date = date(Date), hour = hour(Date)) %>% 
+  group_by(date,hour) %>% 
+  dplyr::summarise(m = mean(price))
+
 #transform 5-minute interval data to hourly by taking hourly averages. Note: transforms date/time into factor
 
 caiso_iso_hr <- aggregate(caiso_iso_5min["price"],

@@ -7,7 +7,12 @@
 #    http://shiny.rstudio.com/
 #
 
+library(tidyverse)
 library(shiny)
+library(shinythemes)
+
+#read in files
+caiso_price <- read_csv("caiso_hourly.csv")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -20,50 +25,50 @@ ui <- fluidPage(
              
              tabPanel("Map of Projects",
                       
-                      radioButtons("type",
-                                   "Renewable Type Preference:",
-                                   choices = c("Solar",
-                                               "Wind",
-                                               "Solar & Wind"))),
-             
-             tabPanel("Project Revenue",
+                      # Sidebar
+                      sidebarLayout(
+                        sidebarPanel(
+                          radioButtons("type",
+                                       "Renewable Type Preference:",
+                                       choices = c("Solar",
+                                                   "Wind",
+                                                   "Solar & Wind"))
+                        )
+                      ),
                       
-                      sliderInput("strike",
-                                  "PPA Strike Price:",
-                                  min = 25,
-                                  max = 60,
-                                  value = 50),
+            tabPanel("Project Revenue",
                       
-                      radioButtons("type",
-                                   "Renewable Type Preference:",
-                                   choices = c("Solar",
-                                               "Wind",
-                                               "Solar & Wind")))
+                      # Sidebar
+                      sidebarLayout(
+                        sidebarPanel(
+                          radioButtons("hub",
+                                       "Choose your hub",
+                                       choices = c("TH_NP15",
+                                                   "TH_SP15",
+                                                   "TH_ZP26")
+                        ),
+                        
+                        # Show a plot of the generated distribution
+                        mainPanel(
+                          plotOutput("vPPAPlot")
+                      )
+                      ))
              
-  ),
-  
-  # Show a plot of the generated distribution
-  mainPanel(
-    plotOutput("distPlot")
-  )
-)
-
+  ))))
+             
 
 # Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+server <- function(input, output) {
   
-  output$distPlot <- renderPlot({
+  output$vPPAPlot <- renderPlot({
     
-    # generate bins based on input$bins from ui.R
-    x    <- faithful[, 2] 
-    bins <- seq(min(x), max(x), length.out = input$bins + 1)
-    
-    # draw the histogram with the specified number of bins
-    hist(x, breaks = bins, col = 'darkgray', border = 'white')
+    #Create ggplot of wholesale prices in California by hub
+    ggplot(filter(caiso_price, ALIGN == input$hub), aes(x = datetime, y = price)) +
+      geom_line()
     
   })
   
-})
+}
 
 
 # Run the application 

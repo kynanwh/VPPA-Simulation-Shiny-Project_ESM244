@@ -25,181 +25,104 @@ library(zoo)
 
 ###Wholesale Electricity Data Exploration
 
-##CAISO
+####CAISO
 
-#5-minute intervale data for three hubs: 
+#####5-minute intervale data for three hubs: 
 TH_NP15
 TH_SP15
 TH_ZP26
 
-```{r}
+```{r get and format data, message=FALSE}
 
-## Find data gaps ##
-
-caiso_iso_5min <- read_csv("caiso_iso.csv")
+caiso <- read_csv("caiso.csv")
 
 #convert "Data" data from character to date/time
 
-caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
-                                 format="%m/%d/%Y %H:%M")
-
-# We have 8757 observations. We are missing 3
-# First remove duplicate date/times b/c tsibble no like that 
-
-clean_caiso_iso_5min <- caiso_iso_5min[!duplicated(caiso_iso_5min$Date),]
-
-caiso_tsibble <- clean_caiso_iso_5min %>%
-  as_tsibble(key = id(hub), index = Date) %>% 
-  fill_gaps(price)
-
-
-
-caiso_full <- caiso_tsibble %>% 
-  fill_gaps(price = 0)
+caiso$date <- as.POSIXct(caiso$date,
+                         format="%m/%d/%Y %H:%M")
 
 ```
 
+```{r filter date by hub}
 
-```{r message=FALSE}
+caiso_sp15 <- caiso %>% 
+  filter(hub == "TH_SP15")
 
-## Turn 5-minute interval data into hourly ##
+caiso_np15 <- caiso %>%
+  filter(hub == "TH_NP15")
 
-caiso_iso_5min <- read_csv("caiso_iso.csv")
-
-#convert "Data" data from character to date/time
-
-caiso_iso_5min$Date <- as.POSIXct(caiso_iso_5min$Date,
-                                 format="%m/%d/%Y %H:%M")
-
-#transform 5-minute interval data to hourly by taking hourly averages. 
-
-caiso_iso_hr2 <- caiso_iso_5min %>% 
-  mutate(date = date(Date), hour = hour(Date)) %>% 
-  group_by(date,hour) %>% 
-  dplyr::summarise(mean_price = mean(price))
-
-#Other transform method (Note: transforms date/time into factor)
-
-caiso_iso_hr <- aggregate(caiso_iso_5min["price"],
-                          list(hour = cut(caiso_iso_5min$Date, breaks = "hour")),
-                          mean, na.rm = TRUE)
-
-caiso_iso_hr$hour <- strptime(x = as.character(caiso_iso_hr$hour),
-                              format = "%m-%d-%Y %H:%M")
-
-caiso_iso_hr$hour <- as.character(caiso_iso_hr$hour)
-
-caiso_iso_hr$hour <- as.POSIXct.default(caiso_iso_hr$hour,
-                                 format="%m-%d-%Y %H:%M:%S")
-
-
+caiso_zp26 <- caiso %>% 
+  filter(hub == "TH_ZP26")
 ```
 
+```{r fill caiso data gaps, message=FALSE}
 
+#sp15 hub
 
+hub1 <- rep("TH_SP15", each=8760)
 
-#hourly intervale data for zones: 
+caiso_sp15_nodup <- caiso_sp15[!duplicated(caiso_sp15$date,
+                                 by = c("date","hub")),]
 
-```{r data}
+caiso_sp15_clean <- caiso_sp15_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
 
-wind_tx <- read.csv("Texas_wind example.csv")
-ercot_iso <-read.csv("ercot_iso.csv")
-nyiso_iso <- read.csv("nyiso_iso.csv")
-pjm_iso <- read.csv("pjm_iso.csv")
-isone_iso <- read.csv("isone.iso.csv")
-miso_iso <- read.csv("miso_iso.csv")
-caiso_iso <- read.csv("caiso_iso.csv")
-
-```
-
-```{r merge_files}
-
-#caiso_hr <- caiso_iso %>% 
-
-#Need to conver to hourly data. Example:
-#library(dplyr)
-#df %>% 
- # filter(between(as.numeric(format(DateTime, "%M")), 25, 35)) %>% 
- # group_by(hour=format(DateTime, "%Y-%m-%d %H")) %>%
-  #summarise(value=mean(value))
+caiso_sp15_clean2 <- data.frame(caiso_sp15_clean, hub1) %>% 
+  rename(hub = hub1)
   
+#np15 hub
 
+hub2 <- rep("TH_NP15", each=8760)
 
-full_iso <- full_join(ercot_iso, nyiso_iso) %>% 
-  full_join(pjm_iso) %>% 
-  full_join(isone_iso) %>% 
-  full_join(miso_iso) %>% 
-  mutate(date_time = as.POSIXct(full_iso$timestamp,
-                                 format="%m/%d/%Y %H:%M")) %>% 
-  select(iso, hub, lmp, date_time)
+caiso_np15_nodup <- caiso_np15[!duplicated(caiso_np15$date,
+                                 by = c("date","hub")),]
 
+caiso_np15_clean <- caiso_np15_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
 
+caiso_np15_clean2 <- data.frame(caiso_np15_clean, hub2) %>% 
+  rename(hub = hub2)
 
+#zp26 hub
 
+hub3 <- rep("TH_ZP26", each=8760)
 
+caiso_zp26_nodup <- caiso_zp26[!duplicated(caiso_zp26$date,
+                                 by = c("date","hub")),]
 
+caiso_zp26_clean <- caiso_zp26_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
+
+caiso_zp26_clean2 <- data.frame(caiso_zp26_clean, hub3) %>% 
+  rename(hub = hub3)
+
+#caiso_whole
+
+caiso_nm <- rep("caiso", each = 26280)
+
+caiso_bind <- rbind(caiso_np15_clean2, caiso_sp15_clean2, caiso_zp26_clean2)
+caiso_clean <- data.frame(caiso_bind, caiso_nm) %>% 
+  rename(iso = caiso_nm)
+
+```
+
+```{r export caiso hourly data}
+
+write.csv(caiso_clean, "caiso_hourly.csv")
 
 ```
 
 
-
-
-
-
-
-
-##Other Examples
-
-```{r wrangle}
-
-ercot$Date <- mdy_hm(ercot$Date)
-
-ercot_dt <- ercot %>%
-  rename(timestamp = Date ) %>% 
-  mutate(time = timestamp) %>% 
-  mutate(date = timestamp)
-
-
-ercot_dt$time <- format.POSIXct(ercot_dt$time, format = "%H:%M:%S")
-ercot_dt$date <- substr(ercot_dt$timestamp, start = 1, stop = 10)
-
-#ercot_dt$date <- format.POSIXct(ercot_dt$date, format = "%M:%D:%Y")
- 
-#Not working
-
-
-```
-
-```{r summarize}
-
-average <- ercot %>% 
-  group_by(Zone) %>% 
-  summarize(
-    mean_price = mean(Price),
-    sd_price = sd(Price)
-  )
-
-```
-
-
-```{r visualize}
-
-hist_ercot <- ggplot(ercot, aes(x = Price)) +
-  geom_histogram(aes(color = Zone),
-                 breaks = c(seq(0, 300, by=10)),
-                 position = "identity") +
-  coord_cartesian(xlim = c(0,310)) +
-  facet_wrap(~Zone, scales = "free")
-
-
-point_ercot <- ggplot(ercot, aes(x = Date, y = Price)) +
-  geom_point(aes(color = Zone)) +
-  facet_wrap(~Zone, scales = "free")
-
-hist_ercot
-point_ercot
-
-```
+###Energy Model
 
 ```{r energy_model}
 

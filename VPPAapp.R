@@ -7,7 +7,7 @@
 #    http://shiny.rstudio.com/
 #
 
-library(tidyverse)tty
+library(tidyverse)
 library(shiny)
 library(shinythemes)
 

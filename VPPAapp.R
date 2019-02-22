@@ -16,7 +16,7 @@ caiso_price <- read_csv("caiso_hourly.csv")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-  theme = shinytheme("cosmo"),
+  f
   
   # Application title
   titlePanel("CBS VPPA Revenue Model"),

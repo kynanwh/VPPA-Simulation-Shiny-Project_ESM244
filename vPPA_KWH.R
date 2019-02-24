@@ -11,7 +11,7 @@ library(shiny)
 library(tidyverse)
 library(shinythemes)
 
-#import data
+#CAISO Wholesale Price Data
 caiso_price <- read_csv("caiso_hourly.csv")
 
 # Define UI for application that draws a histogram
@@ -29,10 +29,16 @@ ui <- fluidPage(
                       sidebarLayout(
                         sidebarPanel(
                           radioButtons("hub",
-                                       "Choose your hub",
+                                       "Choose Your Hub",
                                        choices = c("TH_NP15",
                                                    "TH_SP15",
-                                                   "TH_ZP26"))
+                                                   "TH_ZP26")),
+                          sliderInput("ppa",
+                                      "Adjust PPA Price",
+                                      min = 19,
+                                      max = 35,
+                                      value = 24)
+                          
                                      ), 
                         
                         # Show a plot of the generated distribution
@@ -47,9 +53,13 @@ server <- function(input, output) {
    
    output$vPPAPlot <- renderPlot({
      
+     #CAISO PPA Prices
+     ppa_price <- seq(19,35, by = 1)
+     
      #Create ggplot of wholesale prices in California by hub
      ggplot(filter(caiso_price, hub == input$hub), aes(x = datetime, y = price)) +
-       geom_line()
+       geom_line() +
+       geom_line(filter(data = ppa_price, ppa_price == input$ppa), aes(x=seq_along(value),y=value))
      
    })
 }

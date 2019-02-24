@@ -16,9 +16,6 @@ library(janitor)
 library(lubridate)
 library(dplyr)
 library(tsibble)
-library(anytime)
-library(nycflights13)
-library(zoo)
 
 ```
 
@@ -122,20 +119,47 @@ write.csv(caiso_clean, "caiso_hourly.csv")
 ```
 
 
-###Energy Model
+##Energy Data
 
-```{r energy_model}
+```{r energy_data}
 
-wind_tx <- read.csv("Texas_wind example.csv")
+#Renewable production data
 
-wind_tx$Timestamp <- mdy_hm(wind_tx$Timestamp)
+renew_prod <- read.csv("renewable_gen_info.csv")
 
-wind_tx_2 <- wind_tx %>% 
-  clean_names() %>% 
-  select(timestamp, power_w, energy_m_wh)
+#Renewable project meta data
+
+renew_met <- read.csv("renewable_metadata.csv")
+
+#PPA Prices 
+ppa_price <- seq(19,35, by = 1)
+
+```
+
+##Revenue Model
+
+$Revenue = Production (kWh) \times Wholesale Price (\$/kWh)$
+$Cost = Production (kWh) \times PPA Price (\$kWh)$
+
+```{r write revenue function}
+
+func_test <- function(
   
+  production,
+  wholesale_price,
+  ppa_price
+  
+){
+  
+  cost <- production * wholesale_price
+  revenue <- production * ppa_price
+  cash_flow <- revenue - cost
+  
+  return(cash_flow)
+  
+}
 
-ercot_energy <- full_join(wind_tx, ercot_dt, by = "timestamp") #Not working
+
 
 ```
 

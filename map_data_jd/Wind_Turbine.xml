@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+<idinfo>
+<citation>
+<citeinfo>
+<title>Wind_Turbine</title>
+<onlink>https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Wind_Turbine/FeatureServer</onlink>
+</citeinfo>
+</citation>
+<descript>
+<abstract>Operational wind turbine for California.Additional download formats:File Geodatabase (gdb)Layer file (.lyr)FGDC Metadata (xml)Google Earth (kmz)</abstract>
+<purpose>Operational wind turbine</purpose>
+</descript>
+<keywords>
+<theme>
+<themekt>None</themekt>
+<themekey>Operational wind turbine</themekey>
+</theme>
+</keywords>
+<accconst>None</accconst>
+<useconst>None</useconst>
+<datacred>California Energy Commission - Energy Assessments Division, Supply Analysis Office</datacred>
+</idinfo>
+<metainfo>
+<metd>20180105</metd>
+<metc>
+<cntinfo>
+<!--no contact person or organization name available-->
+</cntinfo>
+</metc>
+<metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+<metstdv>FGDC-STD-001-1998</metstdv>
+<mettc>local time</mettc>
+</metainfo>
+</metadata>

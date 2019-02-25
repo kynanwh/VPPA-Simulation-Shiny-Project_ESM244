@@ -1,0 +1,87 @@
+---
+title: "caiso_shiny"
+author: "Jonathan Dorsey"
+date: "February 23, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(tidyverse)
+library(dplyr)
+library(sf)
+library(ggspatial)
+library(leaflet)
+library(tmap)
+library(raster)
+library(ggrepel)
+```
+
+
+```{r}
+ca_state <- read_sf(dsn = ".", layer = "CA_State_TIGER2016") %>% 
+  dplyr::select(NAME, geometry) %>% 
+  st_simplify(dTolerance = 10) %>% 
+  st_transform(crs = 4326)
+
+ca_iso <- read_sf(dsn = ".", layer = "Balancing_Authority_Areas_in_CA") %>% 
+  filter(NAME == "CALISO") %>% 
+  filter(geometry != "list()") %>% 
+  st_simplify(dTolerance = 10) %>% 
+  st_transform(crs = 4326)
+
+ca_iso$number <- c("1", "2")
+
+ca_iso2 <- ca_iso %>% 
+  filter(number == "1") %>% 
+  dplyr::select(NAME)
+
+ca_wind <- read_sf(dsn = ".", layer = "Wind_Turbine") %>% 
+  filter(COUNTY == "Solano" | COUNTY == "Kern") %>% 
+  filter(OBJECTID == "434" | OBJECTID == "45" | OBJECTID == "454") %>% 
+  st_simplify(dTolerance = 10) %>% 
+  st_transform(crs = 4326)
+
+ca_wind$hub <- c("NP-15", "ZP-26", "SP-15")
+ca_wind$type <- c("Wind", "Wind", "Solar")
+
+ca_wind2 <- ca_wind %>% 
+    dplyr::select(OBJECTID, LATDD, LONDD, COUNTY, geometry, hub,type) %>% 
+    rename(latitude = LATDD) %>% 
+    rename(longitude = LONDD)
+
+
+st_crs(ca_iso) = 4326
+
+plot(ca_state)
+plot(ca_iso2)
+plot(ca_wind2)
+
+# NEED TO FIND ELECTRICTY MARKET REGION SHAPEFILES 
+
+
+ggplot(ca_state) + 
+  geom_sf(aes(fill = NAME), 
+          fill = "brown",
+          color = "black", 
+          show.legend = FALSE) +
+  geom_sf(data = ca_iso2, 
+          fill = "lightgreen", 
+          color = "black", 
+          alpha = 0.8) +
+  geom_point(data = ca_wind2, 
+             aes(x = longitude, y = latitude), 
+             size = 3, 
+             color = "blue", 
+             alpha = 0.5) +
+  theme_minimal() +
+  coord_sf(datum=NA) +
+  labs(x = "", y = "", title = "CAISO Renewable Projects")
+
+# BY THE LOOKS OF THE GRAPH, IT DOESN'T APPEAR THAT WE HAVE A ZP-26 PROJECT FOR WIND
+```
+

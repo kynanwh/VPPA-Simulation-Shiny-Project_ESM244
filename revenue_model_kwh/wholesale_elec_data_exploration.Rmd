@@ -1,0 +1,165 @@
+---
+title: "Wholesale Elec Data Exploration"
+author: "Kynan Witters Hicks"
+date: "January 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, message = FALSE}
+
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(dplyr)
+library(tsibble)
+
+```
+
+
+###Wholesale Electricity Data Exploration
+
+####CAISO
+
+#####5-minute intervale data for three hubs: 
+TH_NP15
+TH_SP15
+TH_ZP26
+
+```{r get and format data, message=FALSE}
+
+caiso <- read_csv("caiso.csv")
+
+#convert "Data" data from character to date/time
+
+caiso$date <- as.POSIXct(caiso$date,
+                         format="%m/%d/%Y %H:%M")
+
+```
+
+```{r filter date by hub}
+
+caiso_sp15 <- caiso %>% 
+  filter(hub == "TH_SP15")
+
+caiso_np15 <- caiso %>%
+  filter(hub == "TH_NP15")
+
+caiso_zp26 <- caiso %>% 
+  filter(hub == "TH_ZP26")
+```
+
+```{r fill caiso data gaps, message=FALSE}
+
+#sp15 hub
+
+hub1 <- rep("TH_SP15", each=8760)
+
+caiso_sp15_nodup <- caiso_sp15[!duplicated(caiso_sp15$date,
+                                 by = c("date","hub")),]
+
+caiso_sp15_clean <- caiso_sp15_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
+
+caiso_sp15_clean2 <- data.frame(caiso_sp15_clean, hub1) %>% 
+  rename(hub = hub1)
+  
+#np15 hub
+
+hub2 <- rep("TH_NP15", each=8760)
+
+caiso_np15_nodup <- caiso_np15[!duplicated(caiso_np15$date,
+                                 by = c("date","hub")),]
+
+caiso_np15_clean <- caiso_np15_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
+
+caiso_np15_clean2 <- data.frame(caiso_np15_clean, hub2) %>% 
+  rename(hub = hub2)
+
+#zp26 hub
+
+hub3 <- rep("TH_ZP26", each=8760)
+
+caiso_zp26_nodup <- caiso_zp26[!duplicated(caiso_zp26$date,
+                                 by = c("date","hub")),]
+
+caiso_zp26_clean <- caiso_zp26_nodup %>%
+  as_tsibble(key = id(hub), index = date) %>% 
+  fill_gaps(price = median(price)) %>% 
+  index_by(datetime = floor_date(date, "hour")) %>% 
+  summarise(price = mean(price))
+
+caiso_zp26_clean2 <- data.frame(caiso_zp26_clean, hub3) %>% 
+  rename(hub = hub3)
+
+#caiso_whole
+
+caiso_nm <- rep("caiso", each = 26280)
+
+caiso_bind <- rbind(caiso_np15_clean2, caiso_sp15_clean2, caiso_zp26_clean2)
+caiso_clean <- data.frame(caiso_bind, caiso_nm) %>% 
+  rename(iso = caiso_nm)
+
+```
+
+```{r export caiso hourly data}
+
+write.csv(caiso_clean, "caiso_hourly.csv")
+
+```
+
+
+##Energy Data
+
+```{r energy_data}
+
+#Renewable production data
+
+renew_prod <- read.csv("renewable_gen_info.csv")
+
+#Renewable project meta data
+
+renew_met <- read.csv("renewable_metadata.csv")
+
+#PPA Prices 
+ppa_price <- seq(19,35, by = 1)
+
+```
+
+##Revenue Model
+
+$Revenue = Production (kWh) \times Wholesale Price (\$/kWh)$
+$Cost = Production (kWh) \times PPA Price (\$kWh)$
+
+```{r write revenue function}
+
+func_test <- function(
+  
+  production,
+  wholesale_price,
+  ppa_price
+  
+){
+  
+  cost <- production * wholesale_price
+  revenue <- production * ppa_price
+  cash_flow <- revenue - cost
+  
+  return(cash_flow)
+  
+}
+
+
+
+```
+

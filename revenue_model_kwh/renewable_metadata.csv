@@ -2,5 +2,5 @@ name,project_type,size_kw,total_output_mwh,long,lat,location,capacity_factor,arr
 solar1,solar,60000,136119.2429,-116.66,33.93,"Whitewater, CA 92282",0.259,1-Axis Tracking,TH_SP15
 solar2,solar,60000,117317.841,-122.46,38.29,"Sonoma, CA 95476",0.223,1-Axis Tracking,TH_NP15
 solar3,solar,60000,127510.5379,-120.46,34.65,"Lompoc, CA 93436",0.243,1-Axis Tracking,TH_ZP26
-,,,,,,,,,
-,,,,,,,,,
+wind1,wind,60000,19471.55,-121.8264,38.17959,,,2MW,TH_NP15
+wind2,wind,60000,16719,-118.4662,34.90205,,,2MW,TH_SP15

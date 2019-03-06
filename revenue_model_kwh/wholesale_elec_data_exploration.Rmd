@@ -16,13 +16,16 @@ library(janitor)
 library(lubridate)
 library(dplyr)
 library(tsibble)
+library(forecast)
+library(tseries)
+library(xts)
 
 ```
 
 
 ###Wholesale Electricity Data Exploration
 
-####CAISO
+####CAISO Data Wrangle - 2018 Data Only
 
 #####5-minute intervale data for three hubs: 
 TH_NP15
@@ -118,6 +121,128 @@ write.csv(caiso_clean, "caiso_hourly.csv")
 
 ```
 
+```{r combine hubs, message = FALSE}
+
+caiso_single <- read_csv("caiso_hourly.csv") %>% 
+  dplyr::group_by(datetime) %>% 
+  dplyr::summarise(
+    mean(price)
+  ) %>% 
+  dplyr::rename(price = "mean(price)")
+
+write.csv(caiso_single, "caiso_single.csv")
+
+```
+
+####CAISO Data Wrangle - 2015 - 2018 Data
+
+```{r get and format data, message=FALSE}
+
+caiso_4yr <- read_csv("caiso_2015-2018.csv")
+
+#convert "Data" data from character to date/time
+
+caiso_4yr$date <- as.POSIXct(caiso_4yr$date,
+                         format="%m/%d/%Y %H:%M")
+
+```
+
+```{r fill caiso data gaps, message=FALSE}
+
+#Remove NA Values
+caiso_na <- which(is.na(caiso_4yr$date), arr.ind=TRUE)
+caiso_nna <- caiso_4yr[-c(caiso_na),]
+
+caiso_hr <- caiso_nna %>% 
+  dplyr::group_by(Date = floor_date(date, "1 hour")) %>% 
+  dplyr::summarise(
+    mean(price)
+  ) %>% 
+  dplyr::rename(price = "mean(price)")
+
+caiso_day <- caiso_nna %>% 
+  dplyr::group_by(Date = floor_date(date, "1 day")) %>% 
+  dplyr::summarise(
+    mean(price)
+  ) %>% 
+  dplyr::rename(price = "mean(price)")
+
+```
+
+
+####Explore Timeseries Data 
+
+```{r decompose hourly data message = FALSE}
+
+caiso_ts_hour <- ts(caiso_hr$price, frequency = 24, start = c(2015,1))
+
+caiso_dc_hour <- decompose(caiso_ts_hour)
+plot(caiso_dc_hour)
+
+```
+```{r decompose daily data}
+
+caiso_ts_day <- ts(caiso_day$price, frequency = 7, start = c(2015,1))
+
+caiso_dc_day <- decompose(caiso_ts_day)
+plot(caiso_dc_day)
+
+```
+
+
+```{r explore hourly data in a day}
+
+caiso_day <- read_csv("caiso_single.csv") %>% 
+  dplyr::mutate(hour = (hour(datetime))) %>% 
+  dplyr::group_by(hour) %>% 
+    dplyr::summarise(
+      mean(price)
+    )
+
+plot(caiso_day)
+
+```
+
+```{r explore daily data}
+
+caiso_daily <- read_csv("caiso_single.csv")
+
+caiso_daily$datetime <- as.POSIXct(caiso_daily$datetime,
+                         format="%m/%d/%Y %H:%M")
+
+caiso_daily_ed <- caiso_daily %>%
+  dplyr::mutate(key = "caiso") %>% 
+  as_tsibble(key = id(key), index = datetime) %>% 
+  index_by(date = floor_date(datetime, "hour")) %>% 
+  summarise(price = mean(price))
+
+plot(caiso_daily)
+
+```
+
+```{r explore monthly data}
+
+caiso_monthly <- read_csv("caiso_single.csv") %>% 
+  dplyr::mutate(month = (month(datetime))) %>% 
+  dplyr::group_by(month) %>% 
+    dplyr::summarise(
+      mean(price)
+    )
+
+```
+
+
+
+```{r filter by datetime message=FALSE}
+
+caiso_hourly <- read_csv("caiso_hourly.csv")
+
+caiso_jan <- caiso_hourly %>% 
+  dplyr::filter(datetime < ymd_hms("2018-02-01 00:00:00"))
+
+```
+
+
 
 ##Energy Data
 
@@ -134,32 +259,36 @@ renew_met <- read.csv("renewable_metadata.csv")
 #PPA Prices 
 ppa_price <- seq(19,35, by = 1)
 
+
+
 ```
+
+```{r reformat energy data}
+
+solar1 <- renew_prod %>% 
+  dplyr::select(solar1, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "solar1") %>% 
+  dplyr::rename(production = solar1)
+
+solar2 <- renew_prod %>% 
+  dplyr::select(solar2, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "solar2")%>% 
+  dplyr::rename(production = solar2)
+
+solar3 <- renew_prod %>% 
+  dplyr::select(solar3, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "solar3")%>% 
+  dplyr::rename(production = solar3)
+
+renew_prod_final <- rbind(solar1, solar2, solar3)
+
+write.csv(renew_prod_final, "renew_prod_final.csv")
+
+```
+
 
 ##Revenue Model
 
 $Revenue = Production (kWh) \times Wholesale Price (\$/kWh)$
 $Cost = Production (kWh) \times PPA Price (\$kWh)$
-
-```{r write revenue function}
-
-func_test <- function(
-  
-  production,
-  wholesale_price,
-  ppa_price
-  
-){
-  
-  cost <- production * wholesale_price
-  revenue <- production * ppa_price
-  cash_flow <- revenue - cost
-  
-  return(cash_flow)
-  
-}
-
-
-
-```
 

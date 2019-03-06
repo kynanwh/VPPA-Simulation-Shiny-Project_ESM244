@@ -1,4 +1,4 @@
-Month,Day,Hour,solar1_output_MW,solar2_output_MW,solar3_output_MW
+Month,Day,Hour,solar1,solar2,solar3
 1,1,0,0,0,0
 1,1,1,0,0,0
 1,1,2,0,0,0

@@ -19,6 +19,8 @@ library(tsibble)
 library(forecast)
 library(tseries)
 library(xts)
+library(plyr)
+library(zoo)
 
 ```
 
@@ -34,7 +36,7 @@ TH_ZP26
 
 ```{r get and format data, message=FALSE}
 
-caiso <- read_csv("caiso.csv")
+caiso <- read_csv("caiso_2018_original.csv")
 
 #convert "Data" data from character to date/time
 
@@ -117,7 +119,7 @@ caiso_clean <- data.frame(caiso_bind, caiso_nm) %>%
 
 ```{r export caiso hourly data}
 
-write.csv(caiso_clean, "caiso_hourly.csv")
+write.csv(caiso_clean, "caiso_2018_hourly_byhub.csv")
 
 ```
 
@@ -130,7 +132,7 @@ caiso_single <- read_csv("caiso_hourly.csv") %>%
   ) %>% 
   dplyr::rename(price = "mean(price)")
 
-write.csv(caiso_single, "caiso_single.csv")
+write.csv(caiso_single, "caiso_2018_hourly_avghubs.csv")
 
 ```
 
@@ -138,7 +140,7 @@ write.csv(caiso_single, "caiso_single.csv")
 
 ```{r get and format data, message=FALSE}
 
-caiso_4yr <- read_csv("caiso_2015-2018.csv")
+caiso_4yr <- read_csv("caiso_2015-2018_original.csv")
 
 #convert "Data" data from character to date/time
 
@@ -172,7 +174,7 @@ caiso_day <- caiso_nna %>%
 
 ####Explore Timeseries Data 
 
-```{r decompose hourly data message = FALSE}
+```{r decompose hourly data 2015 - 2018, message = FALSE}
 
 caiso_ts_hour <- ts(caiso_hr$price, frequency = 24, start = c(2015,1))
 
@@ -180,12 +182,76 @@ caiso_dc_hour <- decompose(caiso_ts_hour)
 plot(caiso_dc_hour)
 
 ```
-```{r decompose daily data}
+
+```{r decompose daily data 2015 - 2018, message=FALSE}
 
 caiso_ts_day <- ts(caiso_day$price, frequency = 7, start = c(2015,1))
 
 caiso_dc_day <- decompose(caiso_ts_day)
 plot(caiso_dc_day)
+
+```
+
+```{r forecast daily data 2015 - 2018, message=FALSE}
+
+caiso_day_pdq <- auto.arima(caiso_day$price)
+caiso_day_pdq
+
+#pdq: (1,1,1)
+
+caiso_day_arima <- arima(caiso_ts_day, order = c(1,1,1))
+caiso_day_arima
+
+forecast_caiso_day <- forecast(caiso_day_arima, h = 365) #365 days = 1 year
+plot(forecast_caiso_day)
+
+caiso_day_forecast_mean <- forecast_caiso_day$mean
+caiso_day_forecast_lower <- forecast_caiso_day$lower
+caiso_day_forecast_upper <- forecast_caiso_day$upper
+
+date_seq <- seq(ymd('2019-01-01'),ymd('2019-12-31'), by = 'days')
+
+caiso_forecast_df <- data.frame(date_seq,
+                                caiso_day_forecast_mean, 
+                                caiso_day_forecast_lower, 
+                                caiso_day_forecast_upper)
+
+caiso_forecast_df_ed <- caiso_forecast_df %>% 
+  dplyr::select(date_seq, caiso_day_forecast_mean, X95., X95..1)
+
+colnames(caiso_forecast_df_ed) <- c("Date", "price", "lower", "upper")
+
+caiso_day_complete <- rbind.fill(caiso_day, caiso_forecast_df_ed)
+
+caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
+                                  format="%m/%d/%Y")
+
+#date breaks
+
+breaks_qtr = seq(from = min(caiso_day_complete$Date), to = max(caiso_day_complete$Date), by = "3 months")
+labels_year = format(seq(from = min(caiso_day_complete$Date), to = max(caiso_day_complete$Date), by = "1 year"), "%Y")
+labs = c(sapply(labels_year, function(x) {
+    c(x, rep("", 3))
+    }))
+
+
+ ggplot(caiso_day_complete, aes(x= Date, y = price)) +
+       geom_line() +
+       geom_ribbon(aes(ymin = lower, ymax= upper),
+                   alpha = 0.1,
+                   fill = "coral") +
+       ylab("Price ($/Megawatt-Hour)") +
+       xlab("") +
+       labs(title = "Historic and Forecasted California Wholesale Prices (2015 - 2020)") +
+       theme_classic() +
+       theme(plot.title = element_text(hjust = 0.5, 
+                                       size = 20),
+             axis.text = element_text(size = 12)) +
+       scale_x_date(labels = labs, breaks = breaks_qtr, name = "Year")
+     
+
+  
+       
 
 ```
 
@@ -280,7 +346,17 @@ solar3 <- renew_prod %>%
   dplyr::mutate(project_name = "solar3")%>% 
   dplyr::rename(production = solar3)
 
-renew_prod_final <- rbind(solar1, solar2, solar3)
+wind1 <- renew_prod %>% 
+  dplyr::select(wind1, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "wind1")%>% 
+  dplyr::rename(production = wind1)
+
+wind2 <- renew_prod %>% 
+  dplyr::select(wind2, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "wind2")%>% 
+  dplyr::rename(production = wind2)
+
+renew_prod_final <- rbind(solar1, solar2, solar3, wind1, wind2)
 
 write.csv(renew_prod_final, "renew_prod_final.csv")
 

@@ -407,4 +407,87 @@ $Cost = Production (kWh) \times PPA Price (\$kWh)$
 
 ```
 
+```{r}
+
+ #wholesale price
+     wholesale_day1 <- caiso_single %>% 
+       dplyr::filter(datetime < ymd_hms("2018-01-02 00:00:00"))
+     
+     #project generation
+     renew_date_string <- wholesale_day1$datetime
+     
+     project_select <- renew_gen %>% 
+       dplyr::filter(Month == "1") %>% 
+       dplyr::filter(Day == "1") %>% 
+       dplyr::filter(project_name %in% "Whitewater")
+     
+     gen_day1 <- data.frame(project_select, renew_date_string) %>% 
+       dplyr::rename(datetime = renew_date_string)
+     
+     
+     #Create values for geom_ribbon 
+     
+     positive_rev <- ifelse(gen_day1$production > 0, 
+                            ifelse(wholesale_day1$price > 25,
+                            wholesale_day1$price - 25,
+                            0), 0)
+     
+     ##ggplot 
+     
+     #Create normalizer for second y-axis (production (MWh))
+     normalizer <- 1.5
+     
+     ggplot(wholesale_day1) +
+       geom_line(aes(x = datetime, 
+                     y = price, 
+                     color = "line1"), 
+                 size = 1,
+                 show.legend = TRUE) +
+       geom_line(data = gen_day1, aes(x = datetime, 
+                                      y = production*normalizer,
+                                      color = "line2"),
+                 size = 1,
+                 show.legend = TRUE) +
+       geom_hline(aes(yintercept = input$ppa,
+                      color = "line3"),
+                  size = 1,
+                  show.legend = TRUE) +
+       scale_colour_manual(name = "Key:",
+                          values = c("line1" = "deeppink3",
+                                     "line2" = "goldenrod",
+                                     "line3" = "dodgerblue3"),
+                          labels = c("Wholesale Price",
+                                     "Energy Production",
+                                     "PPA Price")) +
+       scale_y_continuous("Price (USD)", 
+                          sec.axis = sec_axis(~./normalizer, 
+                                              name = "Production (MWh)",
+                                              breaks = c(0,15,30,45,60)),
+                          breaks = c(0,20,40,60,80),
+                          limits = c(0,80)) +
+       scale_x_datetime(date_breaks = "1 hour", 
+                        date_labels = "%H",
+                        expand = c(0,0)) +
+       labs(title = "How Revenue from a vPPA is Generated (An Example Over One Day)",
+            x = "Hour") +
+       theme_set(theme_bw()) +
+       theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             plot.title = element_text(hjust = 0.5, 
+                                       size = 18,
+                                       margin = margin(0,0,20,0)),
+             axis.text = element_text(size = 16),
+             axis.title.x = element_text(size = 14,
+                                        margin = margin(10,0,0,0)),
+             axis.title.y = element_text(size = 14,
+                                        margin = margin(0,10,0,10)),
+             axis.title.y.right = element_text(size = 14,
+                                               margin = margin(0,10,0,10)),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 14),
+             legend.position = "bottom",
+             legend.direction = "horizontal")
+
+```
+
 

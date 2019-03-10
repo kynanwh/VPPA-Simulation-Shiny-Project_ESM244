@@ -329,23 +329,43 @@ server <- function(input, output) {
      gen_day1 <- data.frame(project_select, renew_date_string) %>% 
        dplyr::rename(datetime = renew_date_string)
      
+     
+     #Create values for geom_ribbon 
+     
+     positive_rev <- ifelse(gen_day1$production > 0, 
+                            ifelse(wholesale_day1$price > input$ppa),
+                            wholesale_day1$price - input$ppp,
+                            0, 0)
+      
+     
+     
+     
+     
      #Create normalizer for second y-axis (production (MWh))
      normalizer <- 1.5
      
      ggplot(wholesale_day1) +
-       geom_line(aes(x = datetime, y = price), 
+       geom_line(aes(x = datetime, 
+                     y = price, 
+                     color = "line1"), 
                  size = 1,
-                 color = "deeppink3") +
+                 show.legend = TRUE) +
        geom_line(data = gen_day1, aes(x = datetime, 
-                                      y = production*normalizer),
+                                      y = production*normalizer,
+                                      color = "line2"),
                  size = 1,
-                 color = "goldenrod") +
-       geom_hline(yintercept = input$ppa, 
-                  size = 1, 
-                  color = "dodgerblue3") +
-       scale_color_discrete(name = "Key", labels = c("PPA Price", 
-                                                     "Energy Generation", 
-                                                     "Wholesale Price")) +
+                 show.legend = TRUE) +
+       geom_hline(aes(yintercept = input$ppa,
+                      color = "line3"),
+                  size = 1,
+                  show.legend = TRUE) +
+       scale_colour_manual(name = "Key:",
+                          values = c("line1" = "deeppink3",
+                                     "line2" = "goldenrod",
+                                     "line3" = "dodgerblue3"),
+                          labels = c("Wholesale Price",
+                                     "Energy Production",
+                                     "PPA Price")) +
        scale_y_continuous("Price (USD)", 
                           sec.axis = sec_axis(~./normalizer, 
                                               name = "Production (MWh)",
@@ -367,7 +387,13 @@ server <- function(input, output) {
              axis.title.x = element_text(size = 14,
                                         margin = margin(10,0,0,0)),
              axis.title.y = element_text(size = 14,
-                                        margin = margin(0,10,0,10)))
+                                        margin = margin(0,10,0,10)),
+             axis.title.y.right = element_text(size = 14,
+                                               margin = margin(0,10,0,10)),
+             legend.text = element_text(size = 12),
+             legend.title = element_text(size = 14),
+             legend.position = "bottom",
+             legend.direction = "horizontal")
      
      })
 

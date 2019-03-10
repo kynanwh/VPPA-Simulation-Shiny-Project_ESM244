@@ -14,15 +14,26 @@ library(lubridate)
 library(tseries)
 library(forecast)
 library(profvis)
+library(leaflet)
+library(sf)
+
+### Data ###
 
 #CAISO Wholesale Price Data
 caiso_price <- read_csv("caiso_2018_hourly_byhub.csv")
 caiso_single <- read_csv("caiso_2018_hourly_avghubs.csv")
 caiso_day_complete <- read_csv("caiso_2015-2018_daily.csv") %>% 
   dplyr::select(Date, price, lower, upper)
+
+#Renewable production data 
 renew_gen <- read_csv("renew_prod_final.csv")
 
-# Define UI for application that draws a histogram
+#Location Data for Renewable Projects 
+ca_projs <- read_csv("renewable_metadata.csv")
+
+
+### Define UI for application that draws a histogram ###
+
 ui <- fluidPage(
   theme = shinytheme("cosmo"),
    
@@ -49,6 +60,27 @@ ui <- fluidPage(
                           plotOutput("wholeprice"),
                           plotOutput("trend"))
                       )),
+             
+             tabPanel("Project Options",
+                      
+                      sidebarLayout(
+                        sidebarPanel(
+                          checkboxGroupInput("renewtype", label = h4("Renewable Energy Type"), 
+                                             choices = list("Solar" = "Solar", 
+                                                            "Wind" = "Wind"),
+                                             selected = "Solar"),
+                          
+                          hr(),
+                          fluidRow(column(3, verbatimTextOutput("value")))
+                          
+                        ),
+                        
+                        # Show a plot of the generated distribution
+                        mainPanel(
+                          leafletOutput(outputId = "map")
+                        )
+             )
+             ),
              
              tabPanel("Project Revenue",
                       
@@ -120,6 +152,39 @@ server <- function(input, output) {
                                        size = 20),
              axis.text = element_text(size = 12)) +
        scale_x_date(labels = labs, breaks = breaks_qtr, name = "Year")
+     
+   })
+   
+   output$map <- renderLeaflet({
+     
+     #Setting geometry
+     projs_sf <- st_as_sf(ca_projs, coords = c("longitude", "latitude"), crs = 4326)
+     
+     st_crs(projs_sf) = 4326
+     
+     #matching png files to coordinate points
+     myicons <- iconList(
+       Fairfield = makeIcon("wind.png",iconWidth = 30, iconHeight = 30),
+       Rosamond = makeIcon("wind.png", iconWidth = 30, iconHeight = 30),
+       Whitewater = makeIcon("sunny.png",iconWidth = 38, iconHeight = 38),
+       Sonoma = makeIcon("sunny.png", iconWidth = 38, iconHeight = 38),
+       Lompoc = makeIcon("sunny.png", iconWidth = 38, iconHeight = 38)
+     )
+     
+     # Filter based on input selection from checkbox input
+     projs <- projs_sf %>% 
+       filter(Type %in% input$renewtype) 
+     
+     # Creating map
+     leaflet(projs_sf) %>% 
+       addTiles() %>% 
+       addMarkers(data = projs, 
+                  icon = ~myicons[name], 
+                  popup = paste( "<b>Name:</b>", projs_sf$name, '<br/>',
+                                 "<b>Project Type:</b>", projs_sf$Type, '<br/>',
+                                 "<b>Generation:</b>", projs_sf$total_output_mwh, "MWh", '<br/>',
+                                 "<b>Size:</b>", projs_sf$size_mw, "MW"  )) %>% 
+       setView(lng=-119.535242, lat= 36.547102, zoom = 5)
      
    })
    

@@ -330,17 +330,6 @@ server <- function(input, output) {
        dplyr::rename(datetime = renew_date_string)
      
      
-     #Create values for geom_ribbon 
-     
-     positive_rev <- ifelse(gen_day1$production > 0, 
-                            ifelse(wholesale_day1$price > input$ppa),
-                            wholesale_day1$price - input$ppp,
-                            0, 0)
-      
-     
-     
-     
-     
      #Create normalizer for second y-axis (production (MWh))
      normalizer <- 1.5
      

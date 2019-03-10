@@ -169,21 +169,16 @@ caiso_day <- caiso_nna %>%
   ) %>% 
   dplyr::rename(price = "mean(price)")
 
+write.csv(caiso_day, "caiso_2015-2018_daily.csv")
+
 ```
 
 
 ####Explore Timeseries Data 
 
-```{r decompose hourly data 2015 - 2018, message = FALSE}
-
-caiso_ts_hour <- ts(caiso_hr$price, frequency = 24, start = c(2015,1))
-
-caiso_dc_hour <- decompose(caiso_ts_hour)
-plot(caiso_dc_hour)
-
-```
-
 ```{r decompose daily data 2015 - 2018, message=FALSE}
+
+caiso_day <- read_csv("caiso_2015-2018_daily.csv")
 
 caiso_ts_day <- ts(caiso_day$price, frequency = 7, start = c(2015,1))
 
@@ -221,20 +216,12 @@ caiso_forecast_df_ed <- caiso_forecast_df %>%
 
 colnames(caiso_forecast_df_ed) <- c("Date", "price", "lower", "upper")
 
-caiso_day_complete <- rbind.fill(caiso_day, caiso_forecast_df_ed)
+caiso_day_complete2 <- rbind.fill(caiso_day, caiso_forecast_df_ed)
 
-caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
+caiso_day_complete2$Date <- as.Date(caiso_day_complete$Date,
                                   format="%m/%d/%Y")
 
-write.csv(caiso_day_complete, "caiso_2015-2018_daily.csv")
-
-
 #### Test for Shiny
-
-caiso_day_complete2 <- read_csv("caiso_2015-2018_daily.csv")
-
-caiso_day_complete2$Date <- as.Date(caiso_day_complete2$Date,
-                                         format="%m/%d/%Y")
 
 #date breaks
 

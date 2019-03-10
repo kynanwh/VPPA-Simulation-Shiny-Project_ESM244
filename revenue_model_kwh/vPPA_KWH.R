@@ -16,14 +16,14 @@ library(forecast)
 library(profvis)
 library(leaflet)
 library(sf)
+library(plyr)
 
 ### Data ###
 
 #CAISO Wholesale Price Data
 caiso_price <- read_csv("caiso_2018_hourly_byhub.csv")
 caiso_single <- read_csv("caiso_2018_hourly_avghubs.csv")
-caiso_day_complete <- read_csv("caiso_2015-2018_daily.csv") %>% 
-  dplyr::select(Date, price, lower, upper)
+caiso_day <- read_csv("caiso_2015-2018_daily.csv")
 
 #Renewable production data 
 renew_gen <- read_csv("renew_prod_final.csv")
@@ -38,9 +38,9 @@ ui <- fluidPage(
   theme = shinytheme("cosmo"),
    
    # Application title
-   titlePanel("CBS VPPA Revenue Model"),
+   titlePanel("Revenue Model of Renewable Energy Virtual Power Purchase Agreement"),
   
-  navbarPage("Here's a main title!",
+  navbarPage("Welcome!",
              
              tabPanel("Wholesale Electricity Prices",
                       
@@ -102,8 +102,8 @@ ui <- fluidPage(
                                       selected = 1)
                         ),
                         mainPanel(
-                          plotOutput("cashflow"),
-                          plotOutput("revgen"))
+                          plotOutput("revgen"),
+                          plotOutput("cashflow"))
                       )
                
                
@@ -115,10 +115,45 @@ ui <- fluidPage(
 server <- function(input, output) {
    
    output$wholeprice <- renderPlot({
+     
+     #put caiso wholesale price in ts format for forecasting
       
-      ##Set data in as.Date format for reactive component
-      caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
-                                         format="%m/%d/%Y")
+     caiso_ts_day <- ts(caiso_day$price, frequency = 7, start = c(2015,1))
+     
+     #Chose to use autoregressive integrated moving average (ARIMA) instead of Holt-Winters to forecast   becuase data doesn't show strong seasonality or cycles. Holt-Winters test does better with seasonality.  
+     
+     #get p,d,q values for arima
+     caiso_day_pdq <- auto.arima(caiso_day$price) #pdq = [1,1,1]
+     
+     caiso_day_arima <- arima(caiso_ts_day, order = c(1,1,1))
+     
+     #forecast
+     forecast_caiso_day <- forecast(caiso_day_arima, h = 365) #365 days = 1 year
+     plot(forecast_caiso_day)
+     
+     #pull out mean, upper, and lower values to bind with origional dataset
+     caiso_day_forecast_mean <- forecast_caiso_day$mean
+     caiso_day_forecast_lower <- forecast_caiso_day$lower
+     caiso_day_forecast_upper <- forecast_caiso_day$upper
+     
+     date_seq <- seq(ymd('2019-01-01'),ymd('2019-12-31'), by = 'days')
+     
+     #create dataframe with forecast values and data sequence
+     caiso_forecast_df <- data.frame(date_seq,
+                                     caiso_day_forecast_mean, 
+                                     caiso_day_forecast_lower, 
+                                     caiso_day_forecast_upper)
+     
+     caiso_forecast_df_ed <- caiso_forecast_df %>% 
+       dplyr::select(date_seq, caiso_day_forecast_mean, X95., X95..1)
+     
+     colnames(caiso_forecast_df_ed) <- c("Date", "price", "lower", "upper")
+     
+     #bind with original 2015-2018 wholesale prices
+     caiso_day_complete <- rbind.fill(caiso_day, caiso_forecast_df_ed)
+     
+     caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
+                                        format="%m/%d/%Y")
       
       ## Visualize Data ##
       
@@ -129,14 +164,16 @@ server <- function(input, output) {
      
       #Format axis
       breaks_qtr = seq(from = min(caiso_day_complete$Date), 
-                       to = max(caiso_day_complete$Date), by = "3 months")
+                       to = max(caiso_day_complete$Date), by = "2 month")
       
       labels_year = format(seq(from = min(caiso_day_complete$Date), 
                                to = max(caiso_day_complete$Date), by = "1 year"), "%Y")
       
       labs = c(sapply(labels_year, function(x) {
-        c(x, rep("", 3))
+        c(x, rep("", 5))
       }))
+      
+      range <-  c(as.Date('2015-01-01'), as.Date('2020-01-01'))
       
       #ggplot
      ggplot(new_caiso_day(), aes(x= Date, y = price)) +
@@ -146,12 +183,23 @@ server <- function(input, output) {
                    fill = "coral") +
        ylab("Price ($/Megawatt-Hour)") +
        xlab("") +
-       labs(title = "Historic and Forecasted California Wholesale Prices (2015 - 2020)") +
-       theme_classic() +
-       theme(plot.title = element_text(hjust = 0.5, 
-                                       size = 20),
-             axis.text = element_text(size = 12)) +
-       scale_x_date(labels = labs, breaks = breaks_qtr, name = "Year")
+       labs(title = "Historical and Forecasted Daily Wholesale Electricity Prices in California (2015 - 2020)") +
+       theme_set(theme_bw()) +
+       theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             plot.title = element_text(hjust = 0.3, 
+                                       size = 18,
+                                       margin = margin(0,0,20,0)),
+             axis.text = element_text(size = 12),
+             axis.title.x = element_text(size = 14,
+                                         margin = margin(10,0,0,0)),
+             axis.title.y = element_text(size = 14,
+                                         margin = margin(0,10,0,0))) +
+       scale_x_date(labels = labs, 
+                    breaks = breaks_qtr, 
+                    #limits = as.Date(c('2015-01-01','2020-01-01')), 
+                    name = "Year",
+                    expand = c(0,0))
      
    })
    
@@ -242,18 +290,24 @@ server <- function(input, output) {
        ylab("Revenue (USD)") +
        xlab("") +
        labs(title = "Revenue Generated from PPA Agreement") +
-       theme_classic() +
-       theme(plot.title = element_text(hjust = 0.5, 
-                                        size = 20),
-              axis.text = element_text(size = 16),
-             axis.text.x = element_text(angle = 60,
-                                        hjust = 1)) +
+       theme_set(theme_bw()) +
+       theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             plot.title = element_text(hjust = 0.5, 
+                                        size = 18,
+                                       margin = margin(50,0,20,0)),
+              axis.text = element_text(size = 12),
+             axis.text.x = element_text(size = 14,
+                                        angle = 60,
+                                        hjust = 1,
+                                        margin = margin(5,0,0,0)),
+             axis.title.y = element_text(size = 14,
+                                         margin = margin(0,10,0,0))) +
        scale_x_datetime(date_breaks = "1 month", 
                         date_labels = "%B",
                         expand = c(0,0))
   
-     
-   })
+    })
    
    output$revgen <- renderPlot({
      
@@ -281,27 +335,39 @@ server <- function(input, output) {
      ggplot(wholesale_day1) +
        geom_line(aes(x = datetime, y = price), 
                  size = 1,
-                 color = "sienna4") +
+                 color = "deeppink3") +
        geom_line(data = gen_day1, aes(x = datetime, 
                                       y = production*normalizer),
                  size = 1,
-                 color = "yellow4") +
+                 color = "goldenrod") +
        geom_hline(yintercept = input$ppa, 
                   size = 1, 
-                  color = "dimgray") +
+                  color = "dodgerblue3") +
+       scale_color_discrete(name = "Key", labels = c("PPA Price", 
+                                                     "Energy Generation", 
+                                                     "Wholesale Price")) +
        scale_y_continuous("Price (USD)", 
                           sec.axis = sec_axis(~./normalizer, 
-                                              name = "Producion (MWh)")) +
+                                              name = "Production (MWh)",
+                                              breaks = c(0,15,30,45,60)),
+                          breaks = c(0,20,40,60,80),
+                          limits = c(0,80)) +
        scale_x_datetime(date_breaks = "1 hour", 
                         date_labels = "%H",
                         expand = c(0,0)) +
-       labs(title = "How Revenue from a PPA is Generated (An Example Over One Day",
+       labs(title = "How Revenue from a vPPA is Generated (An Example Over One Day)",
             x = "Hour") +
-       theme_classic() +
-       theme(plot.title = element_text(hjust = 0.5, 
-                                       size = 20),
-             axis.text = element_text(size = 16))
-       
+       theme_set(theme_bw()) +
+       theme(panel.grid.major = element_blank(),
+             panel.grid.minor = element_blank(),
+             plot.title = element_text(hjust = 0.5, 
+                                       size = 18,
+                                       margin = margin(0,0,20,0)),
+             axis.text = element_text(size = 16),
+             axis.title.x = element_text(size = 14,
+                                        margin = margin(10,0,0,0)),
+             axis.title.y = element_text(size = 14,
+                                        margin = margin(0,10,0,10)))
      
      })
 

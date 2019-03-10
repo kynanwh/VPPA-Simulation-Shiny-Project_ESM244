@@ -226,16 +226,26 @@ caiso_day_complete <- rbind.fill(caiso_day, caiso_forecast_df_ed)
 caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
                                   format="%m/%d/%Y")
 
+write.csv(caiso_day_complete, "caiso_2015-2018_daily.csv")
+
+
+#### Test for Shiny
+
+caiso_day_complete2 <- read_csv("caiso_2015-2018_daily.csv")
+
+caiso_day_complete2$Date <- as.Date(caiso_day_complete2$Date,
+                                         format="%m/%d/%Y")
+
 #date breaks
 
-breaks_qtr = seq(from = min(caiso_day_complete$Date), to = max(caiso_day_complete$Date), by = "3 months")
-labels_year = format(seq(from = min(caiso_day_complete$Date), to = max(caiso_day_complete$Date), by = "1 year"), "%Y")
+breaks_qtr = seq(from = min(caiso_day_complete2$Date), to = max(caiso_day_complete2$Date), by = "3 months")
+labels_year = format(seq(from = min(caiso_day_complete2$Date), to = max(caiso_day_complete2$Date), by = "1 year"), "%Y")
 labs = c(sapply(labels_year, function(x) {
     c(x, rep("", 3))
     }))
 
 
- ggplot(caiso_day_complete, aes(x= Date, y = price)) +
+ ggplot(caiso_day_complete2, aes(x= Date, y = price)) +
        geom_line() +
        geom_ribbon(aes(ymin = lower, ymax= upper),
                    alpha = 0.1,
@@ -331,32 +341,32 @@ ppa_price <- seq(19,35, by = 1)
 
 ```{r reformat energy data}
 
-solar1 <- renew_prod %>% 
-  dplyr::select(solar1, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "solar1") %>% 
-  dplyr::rename(production = solar1)
+Whitewater <- renew_prod %>% 
+  dplyr::select(Whitewater, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Whitewater") %>% 
+  dplyr::rename(production = Whitewater)
 
-solar2 <- renew_prod %>% 
-  dplyr::select(solar2, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "solar2")%>% 
-  dplyr::rename(production = solar2)
+Sonoma <- renew_prod %>% 
+  dplyr::select(Sonoma, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Sonoma")%>% 
+  dplyr::rename(production = Sonoma)
 
-solar3 <- renew_prod %>% 
-  dplyr::select(solar3, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "solar3")%>% 
-  dplyr::rename(production = solar3)
+Lompoc <- renew_prod %>% 
+  dplyr::select(Lompoc, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Lompoc")%>% 
+  dplyr::rename(production = Lompoc)
 
-wind1 <- renew_prod %>% 
-  dplyr::select(wind1, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "wind1")%>% 
-  dplyr::rename(production = wind1)
+Fairfield <- renew_prod %>% 
+  dplyr::select(Fairfield, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Fairfield")%>% 
+  dplyr::rename(production = Fairfield)
 
-wind2 <- renew_prod %>% 
-  dplyr::select(wind2, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "wind2")%>% 
-  dplyr::rename(production = wind2)
+Rosamond <- renew_prod %>% 
+  dplyr::select(Rosamond, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Rosamond")%>% 
+  dplyr::rename(production = Rosamond)
 
-renew_prod_final <- rbind(solar1, solar2, solar3, wind1, wind2)
+renew_prod_final <- rbind(Whitewater, Sonoma, Lompoc, Fairfield, Rosamond)
 
 write.csv(renew_prod_final, "renew_prod_final.csv")
 
@@ -367,4 +377,47 @@ write.csv(renew_prod_final, "renew_prod_final.csv")
 
 $Revenue = Production (kWh) \times Wholesale Price (\$/kWh)$
 $Cost = Production (kWh) \times PPA Price (\$kWh)$
+
+```{r}
+
+
+
+#Production
+     project_select <- renew_gen %>% 
+       filter(project_name %in% "Whitewater")
+     
+     production <- project_select$production
+     
+     #Wholesale Price
+
+     wholesale_price <- caiso_single$price
+     
+     #PPA Price
+     ppa_price <- 24
+     
+     
+    ##Set fuction                            
+     cashflow <- function(
+       
+       production,
+       wholesale_price,
+       ppa_price
+       
+     ){
+       
+       revenue <- production * wholesale_price
+       cost <- production * ppa_price
+       cash_flow <- revenue - cost
+       
+     }
+     
+     cash_output <- cashflow(production, wholesale_price, ppa_price)
+     date_string <- caiso_price$datetime
+     cash_df <- data.frame(date_string, cash_output)
+     
+    ggplot(cash_df, aes(x = date_string, y = cash_output)) +
+      geom_line()
+
+```
+
 

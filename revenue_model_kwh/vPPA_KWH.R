@@ -11,12 +11,15 @@ library(shiny)
 library(tidyverse)
 library(shinythemes)
 library(lubridate)
+library(tseries)
 library(forecast)
+library(profvis)
 
 #CAISO Wholesale Price Data
 caiso_price <- read_csv("caiso_2018_hourly_byhub.csv")
 caiso_single <- read_csv("caiso_2018_hourly_avghubs.csv")
-caiso_4yr <- read_csv("caiso_2015-2018_original.csv")
+caiso_day_complete <- read_csv("caiso_2015-2018_daily.csv") %>% 
+  dplyr::select(Date, price, lower, upper)
 renew_gen <- read_csv("renew_prod_final.csv")
 
 # Define UI for application that draws a histogram
@@ -59,9 +62,11 @@ ui <- fluidPage(
                                       value = 24),
                           selectInput("renew",
                                       "Select Renewable Project", 
-                                      choices = list("solar1" = "solar1",
-                                                     "solar2" = "solar2",
-                                                     "solar3" = "solar3"),
+                                      choices = list("Whitewater (solar)" = "Whitewater",
+                                                     "Sonoma (solar)" = "Sonoma",
+                                                     "Lompoc (solar)" = "Lompoc",
+                                                     "Fairfield (wind)" = "Fairfield",
+                                                     "Rosamond (wind)" = "Rosamond"),
                                       selected = 1)
                         ),
                         mainPanel(
@@ -77,65 +82,13 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output) {
    
-    output$wholeprice <- renderPlot({
+   output$wholeprice <- renderPlot({
       
-      ## Wrangle California 2015-2018 5-minute wholesale price to daily prices ##
-      
-      #format dates as.POSIXct
-      caiso_4yr$date <- as.POSIXct(caiso_4yr$date,
-                                   format="%m/%d/%Y %H:%M")
-      
-      #Remove NA Values
-      caiso_na <- which(is.na(caiso_4yr$date), arr.ind=TRUE)
-      caiso_nna <- caiso_4yr[-c(caiso_na),]
-      
-      #transform 5-minute data to daily data taking mean average of 5-minute prices
-      caiso_day <- caiso_nna %>% 
-        dplyr::group_by(Date = floor_date(date, "1 day")) %>% 
-        dplyr::summarise(
-          mean(price)
-        ) %>% 
-        dplyr::rename(price = "mean(price)")
-      
-      
-      ## Forecast wholesale prices 3 years into future ##
-      
-      #Chose to use autoregressive integrated moving average (ARIMA) instead of Holt-Winters to forecast   becuase data doesn't show strong seasonality or cycles. Holt-Winters test does better with seasonality.  
-      
-      #get p,d,q values for arima
-      caiso_day_pdq <- auto.arima(caiso_day$price) #pdq = [1,1,1]
-      
-      caiso_day_arima <- arima(caiso_ts_day, order = c(1,1,1))
-      
-      #forecast
-      forecast_caiso_day <- forecast(caiso_day_arima, h = 365) #365 days = 1 year
-      plot(forecast_caiso_day)
-      
-      #pull out mean, upper, and lower values to bind with origional dataset
-      caiso_day_forecast_mean <- forecast_caiso_day$mean
-      caiso_day_forecast_lower <- forecast_caiso_day$lower
-      caiso_day_forecast_upper <- forecast_caiso_day$upper
-      
-      date_seq <- seq(ymd('2019-01-01'),ymd('2019-12-31'), by = 'days')
-      
-      #create dataframe with forecast values and data sequence
-      caiso_forecast_df <- data.frame(date_seq,
-                                      caiso_day_forecast_mean, 
-                                      caiso_day_forecast_lower, 
-                                      caiso_day_forecast_upper)
-      
-      caiso_forecast_df_ed <- caiso_forecast_df %>% 
-        dplyr::select(date_seq, caiso_day_forecast_mean, X95., X95..1)
-      
-      colnames(caiso_forecast_df_ed) <- c("Date", "price", "lower", "upper")
-      
-      #bind with original 2015-2018 wholesale prices
-      caiso_day_complete <- rbind.fill(caiso_day, caiso_forecast_df_ed)
-      
+      ##Set data in as.Date format for reactive component
       caiso_day_complete$Date <- as.Date(caiso_day_complete$Date,
                                          format="%m/%d/%Y")
-     
-     ## Visualize Data ##
+      
+      ## Visualize Data ##
       
       #use reactive function to make data column "Date" same length as "input:date" - lenght = 2
       new_caiso_day <- reactive({
@@ -169,26 +122,6 @@ server <- function(input, output) {
        scale_x_date(labels = labs, breaks = breaks_qtr, name = "Year")
      
    })
-   
-   output$trend <- renderPlot({
-     
-     #decompose timeseries and draw out trend
-     
-     caiso_ts <- ts(caiso_single$price, frequency = 24, start = c(2018,1))
-     
-     caiso_dc <- decompose(caiso_ts)
-     caiso_trend <- caiso_dc$trend
-     date_string <- caiso_single$datetime
-     caiso_trend2 <- data.frame(date_string, caiso_trend)
-     
-     
-     #Create ggplot of wholesale prices in California by hub
-     ggplot(caiso_trend2, aes(x = date_string, y = caiso_trend)) +
-       geom_line()
-     
-   })
-   
-  
    
    output$cashflow <- renderPlot({
      
@@ -227,8 +160,33 @@ server <- function(input, output) {
      date_string <- caiso_price$datetime
      cash_df <- data.frame(date_string, cash_output)
      
+     #Set colors
+     #colors <- ifelse(
+       
+    #   cash_output > 0,
+    #   "green",
+    #   "red"
+    # )
+     
+     
      ggplot(cash_df, aes(date_string, cash_output)) +
-       geom_line()
+       geom_line(size = 0.7,
+                 color = "dimgray") +
+       scale_color_manual(values = c("green")) +
+       theme_classic() +
+       ylab("Revenue (USD)") +
+       xlab("") +
+       labs(title = "Revenue Generated from PPA Agreement") +
+       theme_classic() +
+       theme(plot.title = element_text(hjust = 0.5, 
+                                        size = 20),
+              axis.text = element_text(size = 16),
+             axis.text.x = element_text(angle = 60,
+                                        hjust = 1)) +
+       scale_x_datetime(date_breaks = "1 month", 
+                        date_labels = "%B",
+                        expand = c(0,0))
+  
      
    })
    
@@ -256,13 +214,29 @@ server <- function(input, output) {
      normalizer <- 1.5
      
      ggplot(wholesale_day1) +
-       geom_line(aes(x = datetime, y = price)) +
+       geom_line(aes(x = datetime, y = price), 
+                 size = 1,
+                 color = "sienna4") +
        geom_line(data = gen_day1, aes(x = datetime, 
-                                      y = production*normalizer)) +
+                                      y = production*normalizer),
+                 size = 1,
+                 color = "yellow4") +
        geom_hline(yintercept = input$ppa, 
                   size = 1, 
-                  color = "red") +
-       scale_y_continuous("Price (USD)", sec.axis = sec_axis(~./normalizer, name = "Producion (MWh)"))
+                  color = "dimgray") +
+       scale_y_continuous("Price (USD)", 
+                          sec.axis = sec_axis(~./normalizer, 
+                                              name = "Producion (MWh)")) +
+       scale_x_datetime(date_breaks = "1 hour", 
+                        date_labels = "%H",
+                        expand = c(0,0)) +
+       labs(title = "How Revenue from a PPA is Generated (An Example Over One Day",
+            x = "Hour") +
+       theme_classic() +
+       theme(plot.title = element_text(hjust = 0.5, 
+                                       size = 20),
+             axis.text = element_text(size = 16))
+       
      
      })
 

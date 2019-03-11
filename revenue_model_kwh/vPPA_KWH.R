@@ -47,19 +47,19 @@ ui <- fluidPage(
                       # Show a plot of the generated distribution
                       mainPanel(
                         h2(strong("Welcome to our Shiny App!")),
-                        p("This app serves as a guide for corporate renewable energy procurement. In particular, this app uses location-specific renewable energy generation data and historic wholesale electricity market data in California to inform the user of expected revenue in a virtual power purchase agreement (VPPA)."), 
+                        p("This app serves as a guide for corporate renewable energy procurement. In particular, this app uses location-specific renewable energy generation information and historical wholesale electricity market data in California to inform the user of expected revenue in a virtual power purchase agreement (VPPA)."), 
                         
-                        p("A virtual power purchase agreement is a contractual instrument for investing in off-site renewable energy. In this agreement, a corporate offtaker (someone who purchases renewable energy) will continue to purchase and use local grid electricity but signs a contract to purchase a matching amount of energy through a renewable energy generator at a fixed “strike” price. In this transaction, the corporate investor obtains renewable energy credits (RECs) for the generated electricity. When reporting their scope 2 emissions from purchased electricity, the offtaker can use the RECs to offset the emissions associated with using local grid energy."), 
+                        p("A virtual power purchase agreement is a contractual instrument for investing in off-site renewable energy. In this agreement, a corporate offtaker (someone who purchases renewable energy) will continue to purchase and use local grid electricity but signs a contract to purchase a matching amount of energy through a renewable energy generator at a fixed “strike” price (also called a PPA price). In this transaction, the corporate investor obtains renewable energy credits (RECs) for the generated electricity. When reporting their scope 2 emissions from purchased electricity, the offtaker can use the RECs to offset the emissions associated with using local grid energy."), 
                         
-                        p("Since the company is not using the renewable energy that is generated, the renewable generator will sell the electricity to its local grid at a fluctuating wholesale rate. The VPPA contract is also know as a “contract for differences” because the offtaker may have to pay or will receive extra money depending upon delta between the contract electricity price and the wholesale electricity price:"),
+                        p("Since the company is not using the renewable energy that is generated, the renewable generator will sell the electricity to its local grid at a fluctuating wholesale price. The VPPA contract is also know as a “contract for differences” because the offtaker will either pay for or recieve money from the developer for the electricity sold into the market. This contract for differences is determined by the delta between the contract electricity strike price and wholesale electricity prices:"),
                         
-                        p(strong("∆VPPA = Wholesale Electricity Price - Contract Electricity Price")),
+                        p(strong("∆VPPA Revenue = (Wholesale Price x Electricity Generation) - (Contract Strike Price x Electricity Generation)")),
                         
                         p("In a scenario where the generator sells the renewable energy to the wholesale market at a higher price than the fixed contract price, the offtaker will receive the difference as additional revenue. The offtaker can use this additional income to offset some of their regular electricity bill. But, if the generator sells the energy at a wholesale rate lower than the fixed contract price, then the corporate offtaker will have to pay and additional cost to cover the shortcoming. The following is an image that represents the VPPA’s financial structure."),
                         
                         img(src = "VPPA.png"),
                         
-                        p("This app will therefore help its users navigate the logistics of a virtual power purchase agreement by analyzing past wholesale market trends, showing available projects, and determining the expected revenue or costs under various VPPA strike prices. The three tabs in the app include:"),
+                        p("This app will help its users assess the merits of a virtual power purchase agreement by analyzing past wholesale market trends, showing available projects, and determining the expected revenue or costs under various VPPA strike prices. The three tabs in the app include:"),
                         
                         p(strong("1. Wholesale Electricity Prices")),
                         
@@ -67,14 +67,11 @@ ui <- fluidPage(
                         
                         p(strong("2. Project Options")),
                         
-                        p("On this tab, you can filter through different solar and wind projects that are available. Filter the projects by clicking the checkbox on the left. By clicking on the project’s icon, you can gather more information on the project’s name, renewable type, generation capacity, and size."),
+                        p("On this tab, you can filter through different solar and wind projects that are available. Filter the projects by clicking the checkbox on the left. By clicking on the project’s icon, you can gather more information on the project’s location, renewable type, generation capacity, and size."),
                         
                         p(strong("3.	Project Revenue")),
                         
-                        p("On this tab, you can determine the expected revenue or cost of a project by inputting a specified PPA price and project option. The top graph represents a “micro” view of the VPPA delta and displays the wholesale electricity market price in purple, the generation production (MWh) in yellow, and the input PPA contract price in blue. The bottom graph represents the annual revenue generated of a project that takes historic and location-specific wind and solar potential profiles into consideration.")
-                        
-                        
-                        
+                        p("On this tab, you can see the expected revenue or cost of a project by inputting a specified PPA price and project option. The top graph represents a “micro” view of the VPPA delta as a renewable project is generating over the course of a day. The bottom graph represents the annual revenue generated from a project that takes historical and location-specific wind and solar generation profiles into consideration.")
                         
                       )
              ),
@@ -267,9 +264,9 @@ server <- function(input, output) {
        addTiles() %>% 
        addMarkers(data = projs, 
                   icon = ~myicons[name], 
-                  popup = paste( "<b>Name:</b>", projs_sf$name, '<br/>',
-                                 "<b>Project Type:</b>", projs_sf$Type, '<br/>',
-                                 "<b>Generation:</b>", projs_sf$total_output_mwh, "MWh", '<br/>',
+                  popup = paste( "<b>Name:</b>", projs_sf$name,'<br/>',
+                                 "<b>Project Type:</b>", projs_sf$Type,'<br/>',
+                                 "<b>Generation:</b>", projs_sf$total_output_mwh,"MWh",'<br/>',
                                  "<b>Size:</b>", projs_sf$size_mw, "MW"  )) %>% 
        setView(lng=-119.535242, lat= 36.547102, zoom = 5)
      
@@ -435,6 +432,26 @@ server <- function(input, output) {
      #PPA Price
      ppa_price <- input$ppa
      
+     ##Set fuction                            
+     cashflow <- function(
+       
+       production,
+       wholesale_price,
+       ppa_price
+       
+     ){
+       
+       revenue <- production * wholesale_price
+       cost <- production * ppa_price
+       cash_flow <- revenue - cost
+       
+     }
+     
+     cash_output <- cashflow(production, wholesale_price, ppa_price)
+     date_string <- caiso_price$datetime
+     cash_df <- data.frame(date_string, cash_output)
+     
+     #Calculate revenue
      total_revenue <- reactive({
        
        rev_vector <- cashflow(production, wholesale_price, ppa_price)
@@ -443,6 +460,7 @@ server <- function(input, output) {
        
      })
      
+     options(digits = 4)
      total_revenue()
      
    })

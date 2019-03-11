@@ -29,14 +29,16 @@ library(zoo)
 
 ####CAISO Data Wrangle - 2018 Data Only
 
-#####5-minute intervale data for three hubs: 
+#####5-minute interval data for three hubs: 
 TH_NP15
 TH_SP15
 TH_ZP26
 
 ```{r get and format data, message=FALSE}
 
-caiso <- read_csv("caiso_2018_original.csv")
+
+#5-minute interval data for three CA electricity hubs. Source = http://www.energyonline.com
+caiso <- read_csv("caiso_2018_original.csv") 
 
 #convert "Data" data from character to date/time
 
@@ -125,7 +127,7 @@ write.csv(caiso_clean, "caiso_2018_hourly_byhub.csv")
 
 ```{r combine hubs, message = FALSE}
 
-caiso_single <- read_csv("caiso_hourly.csv") %>% 
+caiso_single <- read_csv("caiso_2018_hourly_byhub.csv") %>% 
   dplyr::group_by(datetime) %>% 
   dplyr::summarise(
     mean(price)
@@ -138,12 +140,14 @@ write.csv(caiso_single, "caiso_2018_hourly_avghubs.csv")
 
 ####CAISO Data Wrangle - 2015 - 2018 Data
 
+#####5-minute intervale data 
+
 ```{r get and format data, message=FALSE}
 
+#Average 5-minute CA wholesale electricity price. Source = http://www.energyonline.com
 caiso_4yr <- read_csv("caiso_2015-2018_original.csv")
 
 #convert "Data" data from character to date/time
-
 caiso_4yr$date <- as.POSIXct(caiso_4yr$date,
                          format="%m/%d/%Y %H:%M")
 
@@ -171,8 +175,62 @@ caiso_day <- caiso_nna %>%
 
 write.csv(caiso_day, "caiso_2015-2018_daily.csv")
 
+
 ```
 
+####Energy Data Wrangle
+
+#####Hourly generation data for 5 renewable energy projects (3 solar and 2 wind) for a year
+
+```{r energy_data}
+
+#Renewable production data. Source = https://pvwatts.nrel.gov/pvwatts.php
+
+renew_prod <- read.csv("renewable_gen_info.csv")
+
+#Renewable project meta data. Data simulated. Not real projects
+
+renew_met <- read.csv("renewable_metadata.csv")
+
+#PPA Prices. Source = https://leveltenenergy.com/blog/ppa-price-index/q3-ppa-price-index/
+ppa_price <- seq(19,35, by = 1)
+
+```
+
+```{r reformat energy data}
+
+#reformat so in tidy format
+
+Whitewater <- renew_prod %>% 
+  dplyr::select(Whitewater, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Whitewater") %>% 
+  dplyr::rename(production = Whitewater)
+
+Sonoma <- renew_prod %>% 
+  dplyr::select(Sonoma, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Sonoma")%>% 
+  dplyr::rename(production = Sonoma)
+
+Lompoc <- renew_prod %>% 
+  dplyr::select(Lompoc, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Lompoc")%>% 
+  dplyr::rename(production = Lompoc)
+
+Fairfield <- renew_prod %>% 
+  dplyr::select(Fairfield, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Fairfield")%>% 
+  dplyr::rename(production = Fairfield)
+
+Rosamond <- renew_prod %>% 
+  dplyr::select(Rosamond, Month, Day, Hour) %>% 
+  dplyr::mutate(project_name = "Rosamond")%>% 
+  dplyr::rename(production = Rosamond)
+
+renew_prod_final <- rbind(Whitewater, Sonoma, Lompoc, Fairfield, Rosamond)
+
+write.csv(renew_prod_final, "renew_prod_final.csv")
+
+```
 
 ####Explore Timeseries Data 
 
@@ -221,41 +279,11 @@ caiso_day_complete2 <- rbind.fill(caiso_day, caiso_forecast_df_ed)
 caiso_day_complete2$Date <- as.Date(caiso_day_complete$Date,
                                   format="%m/%d/%Y")
 
-#### Test for Shiny
-
-#date breaks
-
-breaks_qtr = seq(from = min(caiso_day_complete2$Date), to = max(caiso_day_complete2$Date), by = "3 months")
-labels_year = format(seq(from = min(caiso_day_complete2$Date), to = max(caiso_day_complete2$Date), by = "1 year"), "%Y")
-labs = c(sapply(labels_year, function(x) {
-    c(x, rep("", 3))
-    }))
-
-
- ggplot(caiso_day_complete2, aes(x= Date, y = price)) +
-       geom_line() +
-       geom_ribbon(aes(ymin = lower, ymax= upper),
-                   alpha = 0.1,
-                   fill = "coral") +
-       ylab("Price ($/Megawatt-Hour)") +
-       xlab("") +
-       labs(title = "Historic and Forecasted California Wholesale Prices (2015 - 2020)") +
-       theme_classic() +
-       theme(plot.title = element_text(hjust = 0.5, 
-                                       size = 20),
-             axis.text = element_text(size = 12)) +
-       scale_x_date(labels = labs, breaks = breaks_qtr, name = "Year")
-     
-
-  
-       
-
 ```
-
 
 ```{r explore hourly data in a day}
 
-caiso_day <- read_csv("caiso_single.csv") %>% 
+caiso_day <- read_csv("caiso_2018_hourly_avghubs.csv") %>% 
   dplyr::mutate(hour = (hour(datetime))) %>% 
   dplyr::group_by(hour) %>% 
     dplyr::summarise(
@@ -268,7 +296,7 @@ plot(caiso_day)
 
 ```{r explore daily data}
 
-caiso_daily <- read_csv("caiso_single.csv")
+caiso_daily <- read_csv("caiso_2018_hourly_avghubs.csv")
 
 caiso_daily$datetime <- as.POSIXct(caiso_daily$datetime,
                          format="%m/%d/%Y %H:%M")
@@ -283,211 +311,92 @@ plot(caiso_daily)
 
 ```
 
-```{r explore monthly data}
-
-caiso_monthly <- read_csv("caiso_single.csv") %>% 
-  dplyr::mutate(month = (month(datetime))) %>% 
-  dplyr::group_by(month) %>% 
-    dplyr::summarise(
-      mean(price)
-    )
-
-```
-
-
-
-```{r filter by datetime message=FALSE}
-
-caiso_hourly <- read_csv("caiso_hourly.csv")
-
-caiso_jan <- caiso_hourly %>% 
-  dplyr::filter(datetime < ymd_hms("2018-02-01 00:00:00"))
-
-```
-
-
-
-##Energy Data
-
-```{r energy_data}
-
-#Renewable production data
-
-renew_prod <- read.csv("renewable_gen_info.csv")
-
-#Renewable project meta data
-
-renew_met <- read.csv("renewable_metadata.csv")
-
-#PPA Prices 
-ppa_price <- seq(19,35, by = 1)
-
-
-
-```
-
-```{r reformat energy data}
-
-Whitewater <- renew_prod %>% 
-  dplyr::select(Whitewater, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "Whitewater") %>% 
-  dplyr::rename(production = Whitewater)
-
-Sonoma <- renew_prod %>% 
-  dplyr::select(Sonoma, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "Sonoma")%>% 
-  dplyr::rename(production = Sonoma)
-
-Lompoc <- renew_prod %>% 
-  dplyr::select(Lompoc, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "Lompoc")%>% 
-  dplyr::rename(production = Lompoc)
-
-Fairfield <- renew_prod %>% 
-  dplyr::select(Fairfield, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "Fairfield")%>% 
-  dplyr::rename(production = Fairfield)
-
-Rosamond <- renew_prod %>% 
-  dplyr::select(Rosamond, Month, Day, Hour) %>% 
-  dplyr::mutate(project_name = "Rosamond")%>% 
-  dplyr::rename(production = Rosamond)
-
-renew_prod_final <- rbind(Whitewater, Sonoma, Lompoc, Fairfield, Rosamond)
-
-write.csv(renew_prod_final, "renew_prod_final.csv")
-
-```
-
-
-##Revenue Model
+####Revenue Model
 
 $Revenue = Production (kWh) \times Wholesale Price (\$/kWh)$
 $Cost = Production (kWh) \times PPA Price (\$kWh)$
 
+####Attempt to Create geom_ribbons for tab 3: Project Revenue
 ```{r}
+#Create values for geom_ribbon 
 
+#Ribbon #1. Seperate data for ribbon only above ppa price and below wholesale price when energy project is generating. Then set max and min
 
+positive_rev <- ifelse(gen_day1$production > 0, 
+                       ifelse(wholesale_day1$price > 25,
+                              wholesale_day1$price - 25,
+                              ""), "")
 
-#Production
-     project_select <- renew_gen %>% 
-       filter(project_name %in% "Whitewater")
-     
-     production <- project_select$production
-     
-     #Wholesale Price
+positive_rev_df <- data.frame(positive_rev, renew_date_string) %>% 
+  dplyr::rename(datetime = renew_date_string)
 
-     wholesale_price <- caiso_single$price
-     
-     #PPA Price
-     ppa_price <- 24
-     
-     
-    ##Set fuction                            
-     cashflow <- function(
-       
-       production,
-       wholesale_price,
-       ppa_price
-       
-     ){
-       
-       revenue <- production * wholesale_price
-       cost <- production * ppa_price
-       cash_flow <- revenue - cost
-       
-     }
-     
-     cash_output <- cashflow(production, wholesale_price, ppa_price)
-     date_string <- caiso_price$datetime
-     cash_df <- data.frame(date_string, cash_output)
-     
-    ggplot(cash_df, aes(x = date_string, y = cash_output)) +
-      geom_line()
+negative_rev <- ifelse(gen_day1$production > 0,
+                       ifelse(wholesale_day1$price < 25,
+                              25 - wholesale_day1$price,
+                              ""), "")
+
+negative_rev$max <- 0
+negative_rev$min <- min(negative_rev)
+
+##ggplot 
+
+#Create normalizer for second y-axis (production (MWh))
+normalizer <- 1.5
+
+ggplot(wholesale_day1) +
+  geom_line(aes(x = datetime, 
+                y = price, 
+                color = "line1"), 
+            size = 1,
+            show.legend = TRUE) +
+  geom_line(data = gen_day1, 
+            aes(x = datetime,
+                y = production*normalizer,
+                color = "line2"),
+            size = 1,
+            show.legend = TRUE) +
+  geom_hline(aes(yintercept = 25,
+                 color = "line3"),
+             size = 1,
+             show.legend = TRUE) +
+  geom_ribbon(data = positive_rev_df, 
+              aes(x = datetime, ymin=25, ymax=as.numeric(positive_rev))) +
+  scale_colour_manual(name = "Key:",
+                      values = c("line1" = "deeppink3",
+                                 "line2" = "goldenrod",
+                                 "line3" = "dodgerblue3"),
+                      labels = c("Wholesale Price",
+                                 "Energy Production",
+                                 "PPA Price")) +
+  scale_y_continuous("Price (USD)", 
+                     sec.axis = sec_axis(~./normalizer, 
+                                         name = "Production (MWh)",
+                                         breaks = c(0,15,30,45,60)),
+                     breaks = c(0,20,40,60,80),
+                     limits = c(0,80)) +
+  scale_x_datetime(date_breaks = "1 hour", 
+                   date_labels = "%H",
+                   expand = c(0,0)) +
+  labs(title = "How Revenue from a vPPA is Generated (An Example Over One Day)",
+       x = "Hour") +
+  theme_set(theme_bw()) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5, 
+                                  size = 18,
+                                  margin = margin(0,0,20,0)),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 14,
+                                    margin = margin(10,0,0,0)),
+        axis.title.y = element_text(size = 14,
+                                    margin = margin(0,10,0,10)),
+        axis.title.y.right = element_text(size = 14,
+                                          margin = margin(0,10,0,10)),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.position = "bottom",
+        legend.direction = "horizontal")
+
 
 ```
-
-```{r}
-
- #wholesale price
-     wholesale_day1 <- caiso_single %>% 
-       dplyr::filter(datetime < ymd_hms("2018-01-02 00:00:00"))
-     
-     #project generation
-     renew_date_string <- wholesale_day1$datetime
-     
-     project_select <- renew_gen %>% 
-       dplyr::filter(Month == "1") %>% 
-       dplyr::filter(Day == "1") %>% 
-       dplyr::filter(project_name %in% "Whitewater")
-     
-     gen_day1 <- data.frame(project_select, renew_date_string) %>% 
-       dplyr::rename(datetime = renew_date_string)
-     
-     
-     #Create values for geom_ribbon 
-     
-     positive_rev <- ifelse(gen_day1$production > 0, 
-                            ifelse(wholesale_day1$price > 25,
-                            wholesale_day1$price - 25,
-                            0), 0)
-     
-     ##ggplot 
-     
-     #Create normalizer for second y-axis (production (MWh))
-     normalizer <- 1.5
-     
-     ggplot(wholesale_day1) +
-       geom_line(aes(x = datetime, 
-                     y = price, 
-                     color = "line1"), 
-                 size = 1,
-                 show.legend = TRUE) +
-       geom_line(data = gen_day1, aes(x = datetime, 
-                                      y = production*normalizer,
-                                      color = "line2"),
-                 size = 1,
-                 show.legend = TRUE) +
-       geom_hline(aes(yintercept = input$ppa,
-                      color = "line3"),
-                  size = 1,
-                  show.legend = TRUE) +
-       scale_colour_manual(name = "Key:",
-                          values = c("line1" = "deeppink3",
-                                     "line2" = "goldenrod",
-                                     "line3" = "dodgerblue3"),
-                          labels = c("Wholesale Price",
-                                     "Energy Production",
-                                     "PPA Price")) +
-       scale_y_continuous("Price (USD)", 
-                          sec.axis = sec_axis(~./normalizer, 
-                                              name = "Production (MWh)",
-                                              breaks = c(0,15,30,45,60)),
-                          breaks = c(0,20,40,60,80),
-                          limits = c(0,80)) +
-       scale_x_datetime(date_breaks = "1 hour", 
-                        date_labels = "%H",
-                        expand = c(0,0)) +
-       labs(title = "How Revenue from a vPPA is Generated (An Example Over One Day)",
-            x = "Hour") +
-       theme_set(theme_bw()) +
-       theme(panel.grid.major = element_blank(),
-             panel.grid.minor = element_blank(),
-             plot.title = element_text(hjust = 0.5, 
-                                       size = 18,
-                                       margin = margin(0,0,20,0)),
-             axis.text = element_text(size = 16),
-             axis.title.x = element_text(size = 14,
-                                        margin = margin(10,0,0,0)),
-             axis.title.y = element_text(size = 14,
-                                        margin = margin(0,10,0,10)),
-             axis.title.y.right = element_text(size = 14,
-                                               margin = margin(0,10,0,10)),
-             legend.text = element_text(size = 12),
-             legend.title = element_text(size = 14),
-             legend.position = "bottom",
-             legend.direction = "horizontal")
-
-```
-
 
